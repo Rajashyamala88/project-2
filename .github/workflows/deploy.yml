@@ -1,4 +1,4 @@
-name: CI/CD to Azure
+name: CI/CD to Azure (ACI)
 
 on:
   push:
@@ -6,14 +6,15 @@ on:
       - main
 
 jobs:
-  build:
+  build-test-deploy:
     runs-on: ubuntu-latest
+
     env:
-      ACR_NAME: ${{ secrets.ACR_NAME }}
-      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-      IMAGE_NAME: my-webapp
-      APP_PORT: "3001"
-      LOCATION: eastus
+      ACR_NAME: ${{ secrets.ACR_NAME }}                # e.g. acrwebapp49379
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}  # rg-webapp-deploy
+      IMAGE_NAME: my-webapp                            # change if you prefer
+      APP_PORT: "3001"                                 # your Node app port
+      LOCATION: eastus                                 # your RG location
 
     steps:
       - name: Checkout
@@ -27,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Run tests
+      - name: Run tests (if any)
         run: npm test --if-present
 
       - name: Azure login
@@ -41,14 +42,14 @@ jobs:
       - name: ACR docker login
         uses: azure/docker-login@v1
         with:
-          login-server: ${{ env.ACR_NAME }}.azurecr.io
+          login-server: ${{ env.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and push image
         run: |
-          docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest .
-          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest .
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Deploy to Azure Container Instances
         uses: azure/CLI@v1
@@ -58,17 +59,19 @@ jobs:
             if az container show -g "${{ env.RESOURCE_GROUP }}" -n "${{ env.IMAGE_NAME }}-aci" > /dev/null 2>&1; then
               az container delete -g "${{ env.RESOURCE_GROUP }}" -n "${{ env.IMAGE_NAME }}-aci" --yes
             fi
+
             az container create \
               --resource-group "${{ env.RESOURCE_GROUP }}" \
               --name "${{ env.IMAGE_NAME }}-aci" \
-              --image "${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:latest" \
+              --image "${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest" \
               --location "${{ env.LOCATION }}" \
               --ports "${{ env.APP_PORT }}" \
               --dns-name-label "${{ env.IMAGE_NAME }}-${{ github.run_id }}" \
-              --registry-login-server "${{ env.ACR_NAME }}.azurecr.io" \
+              --registry-login-server "${{ env.ACR_LOGIN_SERVER }}" \
               --registry-username "${{ secrets.ACR_USERNAME }}" \
               --registry-password "${{ secrets.ACR_PASSWORD }}" \
               --restart-policy Always
+
             echo "APP_URL=http://${{ env.IMAGE_NAME }}-${{ github.run_id }}.${{ env.LOCATION }}.azurecontainer.io:${{ env.APP_PORT }}" >> $GITHUB_ENV
 
       - name: Show live URL
