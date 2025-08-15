@@ -16,7 +16,7 @@ jobs:
       LOCATION: eastus
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -27,25 +27,25 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
-      - name: Run tests
+      - name: Run tests (if any)
         run: npm test --if-present
 
-      - name: Azure Login
+      - name: Azure login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set ACR login server
+      - name: Set ACR login server env
         run: echo "ACR_LOGIN_SERVER=${{ env.ACR_NAME }}.azurecr.io" >> $GITHUB_ENV
 
-      - name: Docker login to ACR
+      - name: ACR docker login
         uses: azure/docker-login@v1
         with:
           login-server: ${{ env.ACR_LOGIN_SERVER }}
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Build and push image
         run: |
           docker build -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest .
           docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
@@ -73,5 +73,5 @@ jobs:
 
             echo "APP_URL=http://${{ env.IMAGE_NAME }}-${{ github.run_id }}.${{ env.LOCATION }}.azurecontainer.io:${{ env.APP_PORT }}" >> $GITHUB_ENV
 
-      - name: Show live app URL
+      - name: Show live URL
         run: echo "Live app: $APP_URL"
