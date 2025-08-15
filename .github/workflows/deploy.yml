@@ -1,52 +1,77 @@
-name: Deploy to Azure
+name: CI/CD to Azure (ACI)
 
 on:
   push:
-    branches:
-      - main
-
-env:
-  IMAGE_NAME: my-webapp
-  LOCATION: eastus
-  APP_PORT: 3001
-  RESOURCE_GROUP: rg-webapp-deploy
-  ACR_NAME: acrwebapp38496
-  CONTAINER_NAME: mycontainer
+    branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  build-test-deploy:
     runs-on: ubuntu-latest
+
+    env:
+      ACR_NAME: ${{ secrets.ACR_NAME }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      IMAGE_NAME: my-webapp
+      APP_PORT: "3001"
+      LOCATION: eastus
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Log in to Azure
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Run tests
+        run: npm test --if-present
+
+      - name: Azure Login
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Log in to Azure Container Registry
-        run: az acr login --name ${{ env.ACR_NAME }}
+      - name: Set ACR login server
+        run: echo "ACR_LOGIN_SERVER=${{ env.ACR_NAME }}.azurecr.io" >> $GITHUB_ENV
+
+      - name: Docker login to ACR
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.ACR_LOGIN_SERVER }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
 
       - name: Build and push Docker image
         run: |
-          docker build -t ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_id }} .
-          docker push ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_id }}
+          docker build -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest .
+          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Deploy to Azure Container Instances
-        run: |
-          az container create \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name ${{ env.CONTAINER_NAME }}-${{ github.run_id }} \
-            --image ${{ env.ACR_NAME }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.run_id }} \
-            --dns-name-label ${{ env.IMAGE_NAME }}-${{ github.run_id }} \
-            --ports ${{ env.APP_PORT }} \
-            --location ${{ env.LOCATION }} \
-            --restart-policy Always
+        uses: azure/CLI@v1
+        with:
+          azcliversion: 2.60.0
+          inlineScript: |
+            if az container show -g "${{ env.RESOURCE_GROUP }}" -n "${{ env.IMAGE_NAME }}-aci" > /dev/null 2>&1; then
+              az container delete -g "${{ env.RESOURCE_GROUP }}" -n "${{ env.IMAGE_NAME }}-aci" --yes
+            fi
 
-      - name: Set APP_URL
-        run: echo "APP_URL=http://${{ env.IMAGE_NAME }}-${{ github.run_id }}.${{ env.LOCATION }}.azurecontainer.io:${{ env.APP_PORT }}" >> $GITHUB_ENV
+            az container create \
+              --resource-group "${{ env.RESOURCE_GROUP }}" \
+              --name "${{ env.IMAGE_NAME }}-aci" \
+              --image "${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest" \
+              --location "${{ env.LOCATION }}" \
+              --ports "${{ env.APP_PORT }}" \
+              --dns-name-label "${{ env.IMAGE_NAME }}-${{ github.run_id }}" \
+              --registry-login-server "${{ env.ACR_LOGIN_SERVER }}" \
+              --registry-username "${{ secrets.ACR_USERNAME }}" \
+              --registry-password "${{ secrets.ACR_PASSWORD }}" \
+              --restart-policy Always
 
-      - name: Show live URL
+            echo "APP_URL=http://${{ env.IMAGE_NAME }}-${{ github.run_id }}.${{ env.LOCATION }}.azurecontainer.io:${{ env.APP_PORT }}" >> $GITHUB_ENV
+
+      - name: Show live app URL
         run: echo "Live app: $APP_URL"
