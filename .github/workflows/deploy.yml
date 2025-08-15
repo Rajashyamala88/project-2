@@ -39,10 +39,10 @@ jobs:
       - name: Deploy to Azure Web App
         run: |
           az webapp create \
-            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
             --plan myAppServicePlan \
             --name mywebappname \
-            --deployment-container-image-name ${{ secrets.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
+            --deployment-container-image-name "${{ secrets.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}"
 
       - name: Show live URL
         run: echo "Live app: https://mywebappname.azurewebsites.net"
