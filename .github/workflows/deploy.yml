@@ -46,7 +46,7 @@ jobs:
             --restart-policy Always
 
       - name: Set APP_URL
-        run: echo 'APP_URL=http://${{ env.IMAGE_NAME }}-${{ github.run_id }}.${{ env.LOCATION }}.azurecontainer.io:${{ env.APP_PORT }}' >> $GITHUB_ENV
+        run: echo "APP_URL=http://${{ env.IMAGE_NAME }}-${{ github.run_id }}.${{ env.LOCATION }}.azurecontainer.io:${{ env.APP_PORT }}" >> $GITHUB_ENV
 
       - name: Show live URL
         run: echo "Live app: $APP_URL"
