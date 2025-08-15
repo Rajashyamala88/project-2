@@ -10,26 +10,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout GitHub repository
+      - name: Checkout repository
         uses: actions/checkout@v3
-
-      - name: Set up Python (if your app uses Python)
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
 
       - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Build Docker image (if using container)
+      # Build and push Docker image to Azure Container Registry
+      - name: Build and push Docker image
         run: |
-          az acr build --registry <ACR_NAME> --image <IMAGE_NAME>:${{ github.sha }} .
+          az acr build --registry acrwebapp49379 --image webapp:${{ github.sha }} .
 
+      # Deploy Docker image to Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
-          app-name: <APP_NAME>
+          app-name: <APP_NAME>  # Replace with your Azure Web App name
           slot-name: production
-          images: '<ACR_NAME>.azurecr.io/<IMAGE_NAME>:${{ github.sha }}'
+          images: 'acrwebapp49379.azurecr.io/webapp:${{ github.sha }}'
