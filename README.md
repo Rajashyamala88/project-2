@@ -81,6 +81,10 @@ chmod +x azure_setup.sh
 # Run the Azure setup (creates resources and secrets)
 ./azure_setup.sh
 ```
+#  in powershell 
+# run this command
+bash ./azure_setup.sh
+
 
 This script will:
 - Create Azure Resource Group
