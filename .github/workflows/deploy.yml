@@ -1,48 +1,35 @@
-name: Deploy to Azure Web App
+name: Azure WebApp Deploy
 
 on:
   push:
     branches:
-      - main
+      - main   # Trigger deployment on push to main branch
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout GitHub repository
         uses: actions/checkout@v3
 
-      # Install Azure CLI and fix msal bug
-      - name: Update Azure CLI and fix msal
-        run: |
-          az upgrade --yes
-          pip install "msal<1.28.0"
+      - name: Set up Python (if your app uses Python)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
       - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Log in to Azure Container Registry
+      - name: Build Docker image (if using container)
         run: |
-          az acr login --name ${{ secrets.ACR_NAME }}
-
-      - name: Build Docker image
-        run: |
-          docker build . -t ${{ secrets.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
-
-      - name: Push image to ACR
-        run: |
-          docker push ${{ secrets.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}
+          az acr build --registry <ACR_NAME> --image <IMAGE_NAME>:${{ github.sha }} .
 
       - name: Deploy to Azure Web App
-        run: |
-          az webapp create \
-            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-            --plan myAppServicePlan \
-            --name mywebappname \
-            --deployment-container-image-name "${{ secrets.ACR_NAME }}.azurecr.io/myapp:${{ github.sha }}"
-
-      - name: Show live URL
-        run: echo "Live app: https://mywebappname.azurewebsites.net"
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: <APP_NAME>
+          slot-name: production
+          images: '<ACR_NAME>.azurecr.io/<IMAGE_NAME>:${{ github.sha }}'
