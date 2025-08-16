@@ -1,16 +1,16 @@
-name: Azure WebApp Deploy
+name: Create & Deploy Azure WebApp
 
 on:
   push:
     branches:
-      - main   # Trigger deployment on push to main branch
+      - main
 
 jobs:
-  build-and-deploy:
+  create-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout your repository code
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -20,7 +20,19 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # 3️⃣ Log in to Azure Container Registry
+      # 3️⃣ Deploy ARM template to create Web App
+      - name: Create Azure Web App via ARM template
+        run: |
+          az deployment group create \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --template-file ./webapp-template.json \
+            --parameters \
+                webAppName=${{ secrets.WEBAPP_NAME }} \
+                appServicePlanName=${{ secrets.APP_SERVICE_PLAN }} \
+                acrName=acrwebapp49379 \
+                acrImageName=webapp
+
+      # 4️⃣ Log in to Azure Container Registry
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
         with:
@@ -28,20 +40,20 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      # 4️⃣ Build Docker image locally on GitHub runner
+      # 5️⃣ Build Docker image locally
       - name: Build Docker image
         run: |
           docker build -t acrwebapp49379.azurecr.io/webapp:${{ github.sha }} .
 
-      # 5️⃣ Push Docker image to ACR
+      # 6️⃣ Push Docker image to ACR
       - name: Push Docker image
         run: |
           docker push acrwebapp49379.azurecr.io/webapp:${{ github.sha }}
 
-      # 6️⃣ Deploy Docker image to Azure Web App
-      - name: Deploy to Azure Web App
+      # 7️⃣ Deploy Docker image to Azure Web App
+      - name: Deploy Docker image to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
-          app-name: <APP_NAME>   # Replace with your Azure Web App name
+          app-name: ${{ secrets.WEBAPP_NAME }}
           slot-name: production
           images: 'acrwebapp49379.azurecr.io/webapp:${{ github.sha }}'
