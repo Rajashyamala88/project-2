@@ -22,8 +22,7 @@ jobs:
 
       # 3️⃣ Create Resource Group if it doesn't exist
       - name: Create Resource Group if not exists
-        run: |
-          az group create --name ${{ secrets.RESOURCE_GROUP }} --location eastus
+        run: az group create --name ${{ secrets.RESOURCE_GROUP }} --location eastus
 
       # 4️⃣ Deploy ARM template to create App Service Plan + Web App
       - name: Create Azure Web App via ARM template
@@ -47,13 +46,11 @@ jobs:
 
       # 6️⃣ Build Docker image
       - name: Build Docker image
-        run: |
-          docker build -t acrwebapp49379.azurecr.io/webapp:${{ github.sha }} .
+        run: docker build -t acrwebapp49379.azurecr.io/webapp:${{ github.sha }} .
 
       # 7️⃣ Push Docker image to ACR
       - name: Push Docker image
-        run: |
-          docker push acrwebapp49379.azurecr.io/webapp:${{ github.sha }}
+        run: docker push acrwebapp49379.azurecr.io/webapp:${{ github.sha }}
 
       # 8️⃣ Deploy Docker image to Azure Web App
       - name: Deploy Docker image to Azure Web App
