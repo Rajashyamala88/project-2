@@ -61,4 +61,4 @@ jobs:
         with:
           app-name: ${{ secrets.WEBAPP_NAME }}
           slot-name: production
-          images: 'acrw
+          images: 'acrwebapp49379.azurecr.io/webapp:${{ github.sha }}'
